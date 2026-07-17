@@ -127,19 +127,31 @@ docker-compose -f docker-compose.dev.yml down
 
 ---
 
-### Workflow 2: Adding a New Dependency
+### Workflow 2: Adding or Updating a Dependency (THE canonical flow)
+
+⚠️ **Editing pyproject.toml alone is NOT enough.** The Dockerfile installs with `uv sync --frozen`, which installs exactly what `uv.lock` says — it does not check the lock against pyproject.toml. Skipping `uv lock` silently installs the OLD dependency set (symptom: `ModuleNotFoundError` for the package you just added).
+
+**Always run all five steps. Same sequence, every time: edit → lock → rebuild → reconnect → verify.**
 
 ```bash
-# 1. Edit pyproject.toml and add dependency under [project] dependencies
+# 1. Edit pyproject.toml (add/change the dependency)
 
-# 2. Rebuild Docker image (picks up new dependencies)
+# 2. Regenerate the lock — VS Code terminal, INSIDE container (uv only exists there)
+uv lock
+#    (updated uv.lock syncs to Windows automatically via the volume mount)
+
+# 3. Rebuild the image — HOST terminal (permanent fix, baked into the image)
+docker-compose -f docker-compose.dev.yml down
 docker-compose -f docker-compose.dev.yml build
+docker-compose -f docker-compose.dev.yml up -d
 
-# 3. Run to test
-docker-compose -f docker-compose.dev.yml up
+# 4. Reconnect — VS Code: "Reopen in Container"
 
-# Verify the new package is installed and works
+# 5. Verify — container terminal
+python -c "import <package>; print('OK')"
 ```
+
+Do NOT use `uv sync` in the running container as a shortcut — it patches only the live container, which resets to the image's contents on the next recreate. Rebuild every time; it's fast (Docker caches all unchanged layers).
 
 ---
 

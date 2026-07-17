@@ -476,6 +476,7 @@ agents/
 | Issue | Solution |
 |-------|----------|
 | `docker-compose: command not found` | Install Docker Desktop for your OS |
+| `ModuleNotFoundError` for a package listed in pyproject.toml | `uv.lock` is stale — `uv sync --frozen` installs the lock, not pyproject. Run the canonical flow: `uv lock` (container) → `down`/`build`/`up -d` (host) → Reopen in Container (COMMON_COMMANDS.md Workflow 2) |
 | `LANGSMITH_API_KEY not set` | Verify .env file exists in project root with your actual API key |
 | Build fails: `invalid file request .venv/bin/python` | A local `.venv` leaked into the build context. Delete it, ensure `.venv` is in `.dockerignore`, and add `- /app/.venv` to compose volumes |
 | Dev Container fails: "container ... is not running" | Compose `command` must be `sleep infinity` — a short-lived command exits before VS Code can attach |

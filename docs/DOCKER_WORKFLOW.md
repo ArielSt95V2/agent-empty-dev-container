@@ -30,7 +30,7 @@ volumes:
 | Change Type | Example | Action Needed |
 |---|---|---|
 | **Python code** | Edit `main.py` | ✅ None—container sees change instantly (hot reload) |
-| **Dependencies** | Edit `pyproject.toml` | ❌ Must rebuild: `docker-compose build && docker-compose up` |
+| **Dependencies** | Edit `pyproject.toml` | ❌ Must `uv lock` (container) + rebuild (host) — see "When Adding or Updating Dependencies" in Part 4 |
 | **Docker config** | Edit `Dockerfile` or `docker-compose.yml` | ❌ Must rebuild: `docker-compose build && docker-compose up` |
 
 ### How Hot Reload Works
@@ -201,6 +201,14 @@ which python3
 
 ## Part 4: Daily Development Workflow
 
+> **⚠️ Always use `up -d` (detached).** Foreground `up` looks stuck at "Attaching to app-container" — it isn't; `sleep infinity` just never prints anything. If it happens: `Ctrl+C`, then `up -d`. Confirm the container is running with:
+>
+> ```bash
+> docker-compose -f docker-compose.dev.yml ps
+> ```
+>
+> STATUS should say `Up`.
+
 ### Morning: Start Fresh
 
 ```bash
@@ -231,21 +239,28 @@ See output immediately — new code, no rebuild
 
 **Remember**: The dev container idles (`sleep infinity`) — the app does NOT auto-run. You run `python main.py` on demand whenever you want to test.
 
-### When Adding Dependencies
+### When Adding or Updating Dependencies (THE canonical flow)
+
+⚠️ **`uv lock` is mandatory.** The Dockerfile installs with `uv sync --frozen`, which installs exactly what `uv.lock` says — editing pyproject.toml without regenerating the lock silently installs the OLD dependency set (`ModuleNotFoundError`).
 
 ```bash
-# In VS Code terminal (inside container)
-# Edit pyproject.toml to add new package
+# 1. Edit pyproject.toml (add the library)
 
-# In Host terminal (exit VS Code terminal)
+# 2. Container terminal (VS Code):
+uv lock
+
+# 3. Host PowerShell:
 docker-compose -f docker-compose.dev.yml down
-
-# Back in Host terminal
 docker-compose -f docker-compose.dev.yml build
-docker-compose -f docker-compose.dev.yml up
+docker-compose -f docker-compose.dev.yml up -d
 
-# VS Code reconnects automatically
+# 4. VS Code: Reopen in Container
+
+# 5. Verify (container terminal):
+python -c "import <package>"
 ```
+
+Do NOT use `uv sync` in the running container as a shortcut — it patches only the live container, which resets to the image on the next recreate. Rebuilds are fast (Docker caches unchanged layers).
 
 ### End of Day: Stop
 
@@ -273,6 +288,51 @@ docker-compose.dev.yml              ← Container orchestration
 pyproject.toml                      ← Dependencies
 .gitignore                          ← Git rules
 .env                                ← Secrets (local only, never in container)
+```
+
+### Editing .env — Read-Only in the Container (By Design)
+
+Saving `.env` from the Dev Container window fails with:
+
+```
+Error: EROFS: read-only file system, open '/app/.env'
+```
+
+**This is intentional.** In `docker-compose.dev.yml`, the file is mounted read-only:
+
+```yaml
+- ./.env:/app/.env:ro
+```
+
+**Why**: Environment variables from `env_file:` are injected **once, when the container is created** — not read live from the file. Editing `.env` inside the container would change nothing in the running environment, so the read-only mount prevents a false sense of "it worked". Every `.env` change requires recreating the container anyway.
+
+**The workflow for editing .env:**
+
+**Step 1: Open the project locally (host)**
+
+Open a terminal on your PC (host) and run:
+
+```bash
+code C:\Users\astab\Desktop\Coding\agents\
+```
+
+When VS Code prompts "Reopen in container?" — click **Cancel** (stay local). Edit `.env` and save.
+
+**Step 2: Recreate the container (host terminal)**
+
+```bash
+docker-compose -f docker-compose.dev.yml down
+docker-compose -f docker-compose.dev.yml up -d
+```
+
+**Step 3: Reopen the Dev Container**
+
+In VS Code: `Ctrl+Shift+P` → "Dev Containers: Reopen in Container".
+
+**Step 4: Verify the new values (container terminal)**
+
+```bash
+env | grep LANGSMITH
 ```
 
 **After editing these**: 
