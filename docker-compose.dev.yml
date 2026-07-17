@@ -3,7 +3,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: app-container
     working_dir: /app
     volumes:
       - .:/app
