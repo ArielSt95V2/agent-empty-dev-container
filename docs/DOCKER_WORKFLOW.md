@@ -390,7 +390,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends git \
 ```
 
 - **Why `safe.directory /app` at system level**: the container runs as root over Windows-owned files, so git refuses to operate ("detected dubious ownership") without it. Setting it with `--system` bakes it into the image — a `--global` setting made inside a running container would be lost on every rebuild.
-- **Credentials & identity are automatic**: VS Code forwards your host git credentials (HTTPS credential helper / SSH agent) and copies your host `.gitconfig` (user.name / user.email) into the container. `git push` from the container just works — no separate login.
+- **Credentials & identity are automatic — but only over HTTPS**: VS Code bridges the container's git to the Windows credential manager and copies your host `.gitconfig` (user.name / user.email). `git push` just works (first push opens a one-time browser auth).
+- **Use HTTPS remotes, not SSH.** The slim image has no `ssh` client, so SSH remotes fail with `error: cannot run ssh: No such file or directory`. Always clone with the HTTPS URL; if a repo was cloned via SSH, switch it: `git remote set-url origin https://github.com/<user>/<repo>.git`
 
 ### Verify After a Rebuild
 
