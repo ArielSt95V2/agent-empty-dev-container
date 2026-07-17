@@ -1,0 +1,6 @@
+# Forces all text files to use Linux line endings (LF) in both git storage
+# and on disk. Prevents phantom "modified" files caused by Windows (CRLF)
+# and the Linux dev container (LF) interpreting line endings differently.
+# Travels with the repo — every clone behaves identically on any machine.
+
+* text=auto eol=lf
